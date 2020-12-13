@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <string.h>
 
+#include "vr-config-private.h"
 #include "vr-context.h"
 #include "vr-util.h"
 #include "vr-error-message.h"
@@ -137,7 +138,19 @@ find_physical_device(struct vr_context *context,
                 return VR_RESULT_FAIL;
         }
 
-        for (i = 0; i < count; i++) {
+        int dev_id = context->config->device_id;
+        int first_dev = 0;
+        if (dev_id >= 0) {
+                if (dev_id >= count) {
+                        vr_error_message(context->config,
+                                         "Error unsupported device id.");
+                        return VR_RESULT_SKIP;
+                }
+
+                first_dev = dev_id;
+                count = first_dev + 1;
+        }
+        for (i = first_dev; i < count; i++) {
                 if (!vr_requirements_check(reqs,
                                            vkfn,
                                            context->vk_instance,
@@ -249,7 +262,15 @@ init_vk_device(struct vr_context *context,
         if (res != VK_SUCCESS) {
                 vr_error_message(context->config,
                                  "Failed to create VkInstance");
-                return VR_RESULT_FAIL;
+                if (res == VK_ERROR_INCOMPATIBLE_DRIVER) {
+                        /* The loader reports this if there are no
+                         * drivers available at all. In that case we
+                         * want to skip.
+                         */
+                        return VR_RESULT_SKIP;
+                } else {
+                        return VR_RESULT_FAIL;
+                }
         }
 
         vr_vk_init_instance(vkfn, get_instance_proc, context);
