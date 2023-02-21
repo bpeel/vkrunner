@@ -23,8 +23,6 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "config.h"
-
 #include "gui-initial-script.h"
 
 const char

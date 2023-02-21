@@ -17,18 +17,16 @@ fi
 
 rm -fr -- "$build_dir"
 
-mkdir -p "$build_dir"
+meson setup -Dprefix="$install_dir" "$build_dir" "$src_dir"
 cd "$build_dir"
 
-cmake -G Ninja -DCMAKE_INSTALL_PREFIX="$install_dir" "$src_dir"
-
-ninja -C "$build_dir"
+ninja -C "$build_dir" test
 ninja -C "$build_dir" install
 
 # Run the built executable with all of the examples and enable the
 # validation layer. Verify that nothing was written to the output.
 VKRUNNER_ALWAYS_FLUSH_MEMORY=true \
-VK_INSTANCE_LAYERS=VK_LAYER_LUNARG_standard_validation \
+VK_LOADER_LAYERS_ENABLE="*validation" \
                   "$install_dir/bin/vkrunner" \
                   -q \
                   "$src_dir/examples"/*.shader_test \
@@ -57,7 +55,7 @@ sed -rn -e '/^```C\s*$/,/^```\s*$/! b ; s/^```.*// ; p' \
     < "$src_dir/README.md" \
     > "$example_dir/myrunner.c"
 
-export PKG_CONFIG_PATH="$install_dir/lib/pkgconfig"
+export PKG_CONFIG_PATH=$(find "$install_dir" -name pkgconfig)
 
 gcc -Wall -Werror -o "$example_dir/myrunner" "$example_dir/myrunner.c" \
     $(pkg-config vkrunner --cflags --libs)
@@ -65,25 +63,6 @@ gcc -Wall -Werror -o "$example_dir/myrunner" "$example_dir/myrunner.c" \
 for script in "$src_dir/examples/"*.shader_test; do
     "$example_dir/myrunner" "$script"
 done
-
-if test -z "${ANDROID_NDK+x}"; then
-    export ANDROID_NDK="$HOME/Android/Sdk/ndk-bundle"
-fi
-
-if test -d "$ANDROID_NDK"; then
-    and_build_dir="$src_dir/tmp-build-and"
-    rm -fr -- "$and_build_dir"
-    mkdir -p "$and_build_dir"/libs
-    mkdir -p "$and_build_dir"/app
-    cd "$and_build_dir"
-    "$ANDROID_NDK"/ndk-build -C "$src_dir"/android_test \
-                  NDK_PROJECT_PATH="." \
-                  NDK_LIBS_OUT="$and_build_dir"/libs \
-                  NDK_APP_OUT="$and_build_dir"/app
-else
-    echo "NOTE: Not testing Android build because \$ANDROID_NDK is not set "
-    echo "or it couldn’t be found in $ANDROID_NDK"
-fi
 
 echo
 echo "Test build succeeded."
