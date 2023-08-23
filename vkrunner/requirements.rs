@@ -79,6 +79,7 @@ struct LazyStructures {
 }
 
 // Lazily generated VkPhysicalDeviceFeatures struct to pass to Vulkan
+#[repr(align(4))]
 struct LazyBaseFeatures {
     // Array big enough to store a VkPhysicalDeciveFeatures struct.
     // It’s easier to manipulate as an array instead of the actual
