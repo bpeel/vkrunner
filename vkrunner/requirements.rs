@@ -78,12 +78,19 @@ struct LazyStructures {
     list: Vec<u8>,
 }
 
+// Number of features in VkPhysicalDeviceFeatures. The struct is just
+// a series of VkBool32 so we should be able to safely calculate the
+// number based on the struct size.
+const N_PHYSICAL_DEVICE_FEATURES: usize =
+    mem::size_of::<vk::VkPhysicalDeviceFeatures>()
+    / mem::size_of::<vk::VkBool32>();
+
 // Lazily generated VkPhysicalDeviceFeatures struct to pass to Vulkan
 struct LazyBaseFeatures {
     // Array big enough to store a VkPhysicalDeciveFeatures struct.
     // It’s easier to manipulate as an array instead of the actual
     // struct because we want to update the bools by index.
-    bytes: [u8; mem::size_of::<vk::VkPhysicalDeviceFeatures>()],
+    bools: [vk::VkBool32; N_PHYSICAL_DEVICE_FEATURES],
 }
 
 #[derive(Debug)]
@@ -397,7 +404,7 @@ impl Requirements {
         }
     }
 
-    fn update_lazy_base_features(&self) -> &[u8] {
+    fn update_lazy_base_features(&self) -> &[vk::VkBool32] {
         // SAFETY: The only case where lazy_structures will be
         // modified is if it is None and the only way for that to
         // happen is if something modifies the requirements through a
@@ -406,26 +413,20 @@ impl Requirements {
         // nothing can be holding a reference to the lazy data.
         let base_features = unsafe {
             match &mut *self.lazy_base_features.get() {
-                Some(data) => return &data.bytes,
+                Some(data) => return &data.bools,
                 option @ None => {
                     option.insert(LazyBaseFeatures {
-                        bytes: [
-                            0;
-                            mem::size_of::<vk::VkPhysicalDeviceFeatures>()
-                        ],
+                        bools: [0; N_PHYSICAL_DEVICE_FEATURES],
                     })
                 },
             }
         };
 
         for (feature_num, &feature) in self.base_features.iter().enumerate() {
-            let feature_start = feature_num * mem::size_of::<vk::VkBool32>();
-            let feature_end = feature_start + mem::size_of::<vk::VkBool32>();
-            base_features.bytes[feature_start..feature_end]
-                .copy_from_slice(&(feature as vk::VkBool32).to_ne_bytes());
+            base_features.bools[feature_num] = feature as vk::VkBool32;
         }
 
-        &base_features.bytes
+        &base_features.bools
     }
 
     /// Return a pointer to a `VkPhysicalDeviceFeatures` struct that
